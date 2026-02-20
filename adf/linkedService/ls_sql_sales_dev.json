@@ -1,0 +1,23 @@
+{
+	"name": "ls_sql_sales_dev",
+	"properties": {
+		"annotations": [],
+		"type": "AzureSqlDatabase",
+		"typeProperties": {
+			"server": "sql-sales-dev-brs.database.windows.net",
+			"database": "sqldb_sales_source_dev",
+			"encrypt": "mandatory",
+			"trustServerCertificate": false,
+			"authenticationType": "SQL",
+			"userName": "sqladmin_dev",
+			"password": {
+				"type": "AzureKeyVaultSecret",
+				"store": {
+					"referenceName": "ls_keyvault_dev",
+					"type": "LinkedServiceReference"
+				},
+				"secretName": "sql-password-dev"
+			}
+		}
+	}
+}

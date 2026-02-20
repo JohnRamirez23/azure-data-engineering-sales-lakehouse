@@ -1,0 +1,30 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "adf-sales-analytics-dev-brs"
+		},
+		"ls_http_sales_dev_properties_typeProperties_url": {
+			"value": "https://raw.githubusercontent.com/"
+		},
+		"ls_keyvault_dev_properties_typeProperties_baseUrl": {
+			"value": "https://kvsalesdevbrs.vault.azure.net/"
+		},
+		"ls_sql_sales_dev_properties_typeProperties_server": {
+			"value": "sql-sales-dev-brs.database.windows.net"
+		},
+		"ls_sql_sales_dev_properties_typeProperties_database": {
+			"value": "sqldb_sales_source_dev"
+		},
+		"ls_sql_sales_dev_properties_typeProperties_userName": {
+			"value": "sqladmin_dev"
+		},
+		"containerUri": {
+			"value": ""
+		},
+		"containerSasToken": {
+			"value": ""
+		}
+	}
+}

@@ -1,0 +1,10 @@
+{
+	"name": "ls_keyvault_dev",
+	"properties": {
+		"annotations": [],
+		"type": "AzureKeyVault",
+		"typeProperties": {
+			"baseUrl": "https://kvsalesdevbrs.vault.azure.net/"
+		}
+	}
+}

@@ -1,5 +1,5 @@
 {
-	"name": "ds_raw_http_sales_dev",
+	"name": "ds_src_github_sales_dev",
 	"properties": {
 		"linkedServiceName": {
 			"referenceName": "ls_http_sales_dev",
@@ -9,6 +9,9 @@
 			"p_file_name": {
 				"type": "string"
 			}
+		},
+		"folder": {
+			"name": "source"
 		},
 		"annotations": [],
 		"type": "DelimitedText",

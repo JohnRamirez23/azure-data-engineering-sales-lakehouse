@@ -1,9 +1,9 @@
 {
-	"name": "pipeline1",
+	"name": "pl_stg_sales_from_github_dev",
 	"properties": {
 		"activities": [
 			{
-				"name": "Copy data1",
+				"name": "act_copy_github_to_stg_sales",
 				"type": "Copy",
 				"dependsOn": [],
 				"policy": {
@@ -25,19 +25,175 @@
 							"type": "DelimitedTextReadSettings"
 						}
 					},
-					"enableStaging": false
+					"sink": {
+						"type": "AzureSqlSink",
+						"writeBehavior": "insert",
+						"sqlWriterUseTableLock": false
+					},
+					"enableStaging": false,
+					"translator": {
+						"type": "TabularTranslator",
+						"mappings": [
+							{
+								"source": {
+									"name": "Branch_ID",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "Branch_ID",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Dealer_ID",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "Dealer_ID",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Model_ID",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "Model_ID",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Revenue",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "Revenue",
+									"type": "Int64",
+									"physicalType": "bigint"
+								}
+							},
+							{
+								"source": {
+									"name": "Units_Sold",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "Units_Sold",
+									"type": "Int64",
+									"physicalType": "bigint"
+								}
+							},
+							{
+								"source": {
+									"name": "Date_ID",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "Date_ID",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "Day",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "Day",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "Month",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "Month",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "Year",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "Year",
+									"type": "Int32",
+									"physicalType": "int"
+								}
+							},
+							{
+								"source": {
+									"name": "BranchName",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "BranchName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							},
+							{
+								"source": {
+									"name": "DealerName",
+									"type": "String",
+									"physicalType": "String"
+								},
+								"sink": {
+									"name": "DealerName",
+									"type": "String",
+									"physicalType": "varchar"
+								}
+							}
+						],
+						"typeConversion": true,
+						"typeConversionSettings": {
+							"allowDataTruncation": true,
+							"treatBooleanAsNumber": false
+						}
+					}
 				},
 				"inputs": [
 					{
-						"referenceName": "ds_raw_http_sales_dev",
+						"referenceName": "ds_src_github_sales_dev",
 						"type": "DatasetReference",
 						"parameters": {
 							"p_file_name": "SalesData.csv"
 						}
 					}
+				],
+				"outputs": [
+					{
+						"referenceName": "ds_stg_sql_sales_dev",
+						"type": "DatasetReference"
+					}
 				]
 			}
 		],
+		"folder": {
+			"name": "staging"
+		},
 		"annotations": []
 	}
 }

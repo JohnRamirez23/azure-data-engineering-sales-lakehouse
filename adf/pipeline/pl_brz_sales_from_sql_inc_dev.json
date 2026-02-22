@@ -32,7 +32,13 @@
 					},
 					"dataset": {
 						"referenceName": "ds_stg_sql_sales_dev",
-						"type": "DatasetReference"
+						"type": "DatasetReference",
+						"parameters": {
+							"table_name": {
+								"value": "@pipeline().parameters.p_source_table",
+								"type": "Expression"
+							}
+						}
 					}
 				}
 			},
@@ -67,7 +73,13 @@
 					},
 					"dataset": {
 						"referenceName": "ds_stg_sql_sales_dev",
-						"type": "DatasetReference"
+						"type": "DatasetReference",
+						"parameters": {
+							"table_name": {
+								"value": "@pipeline().parameters.p_source_table",
+								"type": "Expression"
+							}
+						}
 					}
 				}
 			},
@@ -84,7 +96,8 @@
 				],
 				"userProperties": [],
 				"typeProperties": {
-					"message": "Watermark lookup failed."
+					"message": "Watermark lookup failed.",
+					"errorCode": "WATERMARK_ERROR"
 				}
 			},
 			{
@@ -100,7 +113,8 @@
 				],
 				"userProperties": [],
 				"typeProperties": {
-					"message": "Watermark lookup failed."
+					"message": "Watermark lookup failed.",
+					"errorCode": "WATERMARK_ERROR"
 				}
 			},
 			{
@@ -452,7 +466,8 @@
 							],
 							"userProperties": [],
 							"typeProperties": {
-								"message": "Copy activity failed. Check etl_run_log for details."
+								"message": "Copy activity failed. Check etl_run_log for details.",
+								"errorCode": "COPY_ACTIVITY_ERROR"
 							}
 						}
 					]

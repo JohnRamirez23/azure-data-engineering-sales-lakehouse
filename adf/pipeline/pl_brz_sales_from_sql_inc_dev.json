@@ -103,6 +103,8 @@
 			{
 				"name": "act_fail_current_watermark_lookup",
 				"type": "Fail",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "act_lkp_current_watermark_sql",
@@ -120,6 +122,8 @@
 			{
 				"name": "act_if_new_data_exists",
 				"type": "IfCondition",
+				"state": "Inactive",
+				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "act_lkp_current_watermark_sql",
@@ -233,7 +237,10 @@
 							"typeProperties": {
 								"source": {
 									"type": "AzureSqlSource",
-									"sqlReaderQuery": "SELECT *\nFROM @{pipeline().parameters.p_source_table}\nWHERE @{pipeline().parameters.p_watermark_column} > \n'@{activity('act_lkp_last_watermark_sql').output.firstRow.last_watermark_value}'",
+									"sqlReaderQuery": {
+										"value": "SELECT *\nFROM @{pipeline().parameters.p_source_table}\nWHERE @{pipeline().parameters.p_watermark_column} > \n'@{activity('act_lkp_last_watermark_sql').output.firstRow.last_watermark_value}'",
+										"type": "Expression"
+									},
 									"queryTimeout": "02:00:00",
 									"partitionOption": "None"
 								},
@@ -286,7 +293,7 @@
 							]
 						},
 						{
-							"name": "act_sp_validate_new_records",
+							"name": "act_sp_update_watermark_sales",
 							"type": "SqlServerStoredProcedure",
 							"dependsOn": [
 								{
@@ -308,76 +315,15 @@
 								"storedProcedureName": "[dbo].[usp_UpdateWatermark]",
 								"storedProcedureParameters": {
 									"new_watermark_value": {
-										"value": "",
+										"value": {
+											"value": "@activity('act_lkp_current_watermark_sql').output.firstRow.current_watermark",
+											"type": "Expression"
+										},
 										"type": "String"
 									},
 									"source_table": {
 										"value": {
 											"value": "@pipeline().parameters.p_source_table",
-											"type": "Expression"
-										},
-										"type": "String"
-									}
-								}
-							},
-							"linkedServiceName": {
-								"referenceName": "ls_sql_sales_dev",
-								"type": "LinkedServiceReference"
-							}
-						},
-						{
-							"name": "act_sp_update_watermark_sales",
-							"type": "SqlServerStoredProcedure",
-							"dependsOn": [
-								{
-									"activity": "act_copy_sql_to_brz_sales_inc",
-									"dependencyConditions": [
-										"Failed"
-									]
-								}
-							],
-							"policy": {
-								"timeout": "0.12:00:00",
-								"retry": 0,
-								"retryIntervalInSeconds": 30,
-								"secureOutput": false,
-								"secureInput": false
-							},
-							"userProperties": [],
-							"typeProperties": {
-								"storedProcedureName": "[dbo].[usp_LogRun]",
-								"storedProcedureParameters": {
-									"error_message": {
-										"value": {
-											"value": "@activity('act_copy_sql_to_brz_sales_inc').error.message",
-											"type": "Expression"
-										},
-										"type": "String"
-									},
-									"pipeline_name": {
-										"value": {
-											"value": "@pipeline().Pipeline",
-											"type": "Expression"
-										},
-										"type": "String"
-									},
-									"rows_copied": {
-										"value": {
-											"value": "0",
-											"type": "Expression"
-										},
-										"type": "Int32"
-									},
-									"source_table": {
-										"value": {
-											"value": "@pipeline().parameters.p_source_table",
-											"type": "Expression"
-										},
-										"type": "String"
-									},
-									"status": {
-										"value": {
-											"value": "'FAILED'",
 											"type": "Expression"
 										},
 										"type": "String"
@@ -394,7 +340,7 @@
 							"type": "SqlServerStoredProcedure",
 							"dependsOn": [
 								{
-									"activity": "act_sp_validate_new_records",
+									"activity": "act_sp_update_watermark_sales",
 									"dependencyConditions": [
 										"Succeeded"
 									]
@@ -458,7 +404,7 @@
 							"type": "Fail",
 							"dependsOn": [
 								{
-									"activity": "act_sp_update_watermark_sales",
+									"activity": "act_sp_log_run_failed",
 									"dependencyConditions": [
 										"Completed"
 									]
@@ -466,8 +412,75 @@
 							],
 							"userProperties": [],
 							"typeProperties": {
-								"message": "Copy activity failed. Check etl_run_log for details.",
-								"errorCode": "COPY_ACTIVITY_ERROR"
+								"message": {
+									"value": "@concat('COPY FAILED - ', pipeline().Pipeline)",
+									"type": "Expression"
+								},
+								"errorCode": "COPY_FAILED"
+							}
+						},
+						{
+							"name": "act_sp_log_run_failed",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "act_copy_sql_to_brz_sales_inc",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[usp_LogRun]",
+								"storedProcedureParameters": {
+									"error_message": {
+										"value": {
+											"value": "@activity('act_copy_sql_to_brz_sales_inc').error.message",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"pipeline_name": {
+										"value": {
+											"value": "@pipeline().Pipeline",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"rows_copied": {
+										"value": {
+											"value": "0",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"source_table": {
+										"value": {
+											"value": "@pipeline().parameters.p_source_table",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"status": {
+										"value": {
+											"value": "'FAILED'",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_sql_sales_dev",
+								"type": "LinkedServiceReference"
 							}
 						}
 					]

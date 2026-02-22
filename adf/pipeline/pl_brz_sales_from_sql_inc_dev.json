@@ -279,7 +279,7 @@
 									"type": "DatasetReference",
 									"parameters": {
 										"p_directory": {
-											"value": "@concat('bronze/incremental')",
+											"value": "@concat('incremental')",
 											"type": "Expression"
 										},
 										"p_file_name": {

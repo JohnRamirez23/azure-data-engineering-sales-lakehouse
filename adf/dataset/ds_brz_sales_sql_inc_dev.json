@@ -1,0 +1,38 @@
+{
+	"name": "ds_brz_sales_sql_inc_dev",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_adls_sales_dev",
+			"type": "LinkedServiceReference"
+		},
+		"parameters": {
+			"p_directory": {
+				"type": "string"
+			},
+			"p_file_name": {
+				"type": "string"
+			}
+		},
+		"folder": {
+			"name": "bronze"
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": {
+					"value": "@dataset().p_file_name",
+					"type": "Expression"
+				},
+				"folderPath": {
+					"value": "@dataset().p_directory",
+					"type": "Expression"
+				},
+				"fileSystem": "bronze"
+			},
+			"compressionCodec": "snappy"
+		},
+		"schema": []
+	}
+}

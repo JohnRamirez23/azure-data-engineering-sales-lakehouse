@@ -54,7 +54,22 @@
 					"secureOutput": false,
 					"secureInput": false
 				},
-				"userProperties": []
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderQuery": {
+							"value": "SELECT MAX(Date_ID) AS current_watermark\nFROM @{pipeline().parameters.p_source_table}",
+							"type": "Expression"
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "ds_stg_sql_sales_dev",
+						"type": "DatasetReference"
+					}
+				}
 			},
 			{
 				"name": "act_fail_last_watermark_lookup",
@@ -89,7 +104,7 @@
 				}
 			},
 			{
-				"name": "If Condition1",
+				"name": "act_if_new_data_exists",
 				"type": "IfCondition",
 				"dependsOn": [
 					{
@@ -208,7 +223,24 @@
 									"queryTimeout": "02:00:00",
 									"partitionOption": "None"
 								},
-								"enableStaging": false
+								"sink": {
+									"type": "ParquetSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "ParquetWriteSettings"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
 							},
 							"inputs": [
 								{
@@ -217,6 +249,22 @@
 									"parameters": {
 										"table_name": {
 											"value": "@pipeline().parameters.p_source_table",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "ds_brz_sales_sql_inc_dev",
+									"type": "DatasetReference",
+									"parameters": {
+										"p_directory": {
+											"value": "@concat('sales/year=', substring(activity('act_lkp_current_watermark_sql').output.firstRow.last_watermark_value,0,4))",
+											"type": "Expression"
+										},
+										"p_file_name": {
+											"value": "@concat(\n    'sales_',\n    activity('act_lkp_current_watermark_sql').output.firstRow.last_watermark_value,\n    '.parquet'\n)",
 											"type": "Expression"
 										}
 									}

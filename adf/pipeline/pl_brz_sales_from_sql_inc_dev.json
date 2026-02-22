@@ -279,11 +279,11 @@
 									"type": "DatasetReference",
 									"parameters": {
 										"p_directory": {
-											"value": "@concat('sales/year=', substring(activity('act_lkp_current_watermark_sql').output.firstRow.last_watermark_value,0,4))",
+											"value": "@concat('bronze/incremental')",
 											"type": "Expression"
 										},
 										"p_file_name": {
-											"value": "@concat(\n    'sales_',\n    activity('act_lkp_current_watermark_sql').output.firstRow.last_watermark_value,\n    '.parquet'\n)",
+											"value": "@concat(\n  activity('act_lkp_current_watermark_sql').output.firstRow.current_watermark,\n  '.parquet'\n)",
 											"type": "Expression"
 										}
 									}

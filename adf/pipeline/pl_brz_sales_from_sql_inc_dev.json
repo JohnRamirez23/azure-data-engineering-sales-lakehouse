@@ -1,0 +1,425 @@
+{
+	"name": "pl_brz_sales_from_sql_inc_dev",
+	"properties": {
+		"activities": [
+			{
+				"name": "act_lkp_last_watermark_sql",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"sqlReaderStoredProcedureName": "[dbo].[usp_GetWatermark]",
+						"storedProcedureParameters": {
+							"source_table": {
+								"type": "String",
+								"value": {
+									"value": "@pipeline().parameters.p_source_table",
+									"type": "Expression"
+								}
+							}
+						},
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "ds_stg_sql_sales_dev",
+						"type": "DatasetReference"
+					}
+				}
+			},
+			{
+				"name": "act_lkp_current_watermark_sql",
+				"type": "Lookup",
+				"dependsOn": [
+					{
+						"activity": "act_lkp_last_watermark_sql",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": []
+			},
+			{
+				"name": "Fail1",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "act_lkp_last_watermark_sql",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": "Watermark lookup failed."
+				}
+			},
+			{
+				"name": "Fail2",
+				"type": "Fail",
+				"dependsOn": [
+					{
+						"activity": "act_lkp_current_watermark_sql",
+						"dependencyConditions": [
+							"Failed"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"message": "Watermark lookup failed."
+				}
+			},
+			{
+				"name": "If Condition1",
+				"type": "IfCondition",
+				"dependsOn": [
+					{
+						"activity": "act_lkp_current_watermark_sql",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"expression": {
+						"value": "@not(equals(\n    activity('act_lkp_last_watermark_sql').output.firstRow.last_watermark_value,\n    activity('act_lkp_current_watermark_sql').output.firstRow.NewMaxValue\n))",
+						"type": "Expression"
+					},
+					"ifFalseActivities": [
+						{
+							"name": "Set variable1",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "v_run_status",
+								"value": {
+									"value": "'NO_NEW_DATA'",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Stored procedure5",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Set variable1",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[usp_LogRun]",
+								"storedProcedureParameters": {
+									"error_message": {
+										"value": "NULL",
+										"type": "String"
+									},
+									"pipeline_name": {
+										"value": {
+											"value": "@pipeline().Pipeline",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"rows_copied": {
+										"value": "0",
+										"type": "Int32"
+									},
+									"source_table": {
+										"value": {
+											"value": "@pipeline().parameters.p_source_table",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"status": {
+										"value": "'NO_NEW_DATA'",
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_sql_sales_dev",
+								"type": "LinkedServiceReference"
+							}
+						}
+					],
+					"ifTrueActivities": [
+						{
+							"name": "act_copy_sql_to_brz_sales_inc",
+							"type": "Copy",
+							"dependsOn": [],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": "SELECT *\nFROM @{pipeline().parameters.p_source_table}\nWHERE @{pipeline().parameters.p_watermark_column} > \n'@{activity('act_lkp_last_watermark_sql').output.firstRow.last_watermark_value}'",
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "ds_stg_sql_sales_dev",
+									"type": "DatasetReference",
+									"parameters": {
+										"table_name": {
+											"value": "@pipeline().parameters.p_source_table",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						},
+						{
+							"name": "Stored procedure2",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "act_copy_sql_to_brz_sales_inc",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[usp_UpdateWatermark]",
+								"storedProcedureParameters": {
+									"new_watermark_value": {
+										"value": "",
+										"type": "String"
+									},
+									"source_table": {
+										"value": {
+											"value": "@pipeline().parameters.p_source_table",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_sql_sales_dev",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Stored procedure4",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "act_copy_sql_to_brz_sales_inc",
+									"dependencyConditions": [
+										"Failed"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[usp_LogRun]",
+								"storedProcedureParameters": {
+									"error_message": {
+										"value": {
+											"value": "@activity('act_copy_sql_to_brz_sales_inc').error.message",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"pipeline_name": {
+										"value": {
+											"value": "@pipeline().Pipeline",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"rows_copied": {
+										"value": {
+											"value": "0",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"source_table": {
+										"value": {
+											"value": "@pipeline().parameters.p_source_table",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"status": {
+										"value": {
+											"value": "'FAILED'",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_sql_sales_dev",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Stored procedure3",
+							"type": "SqlServerStoredProcedure",
+							"dependsOn": [
+								{
+									"activity": "Stored procedure2",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"storedProcedureName": "[dbo].[usp_LogRun]",
+								"storedProcedureParameters": {
+									"error_message": {
+										"value": {
+											"value": "NULL",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"pipeline_name": {
+										"value": {
+											"value": "@pipeline().Pipeline",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"rows_copied": {
+										"value": {
+											"value": "@activity('act_copy_sql_to_brz_sales_inc').output.rowsCopied",
+											"type": "Expression"
+										},
+										"type": "Int32"
+									},
+									"source_table": {
+										"value": {
+											"value": "@pipeline().parameters.p_source_table",
+											"type": "Expression"
+										},
+										"type": "String"
+									},
+									"status": {
+										"value": {
+											"value": "'SUCCESS'",
+											"type": "Expression"
+										},
+										"type": "String"
+									}
+								}
+							},
+							"linkedServiceName": {
+								"referenceName": "ls_sql_sales_dev",
+								"type": "LinkedServiceReference"
+							}
+						},
+						{
+							"name": "Fail3",
+							"type": "Fail",
+							"dependsOn": [
+								{
+									"activity": "Stored procedure4",
+									"dependencyConditions": [
+										"Completed"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"message": "Copy activity failed. Check etl_run_log for details."
+							}
+						}
+					]
+				}
+			}
+		],
+		"parameters": {
+			"p_source_table": {
+				"type": "string",
+				"defaultValue": "source_cars_data"
+			},
+			"p_watermark_column": {
+				"type": "string",
+				"defaultValue": "Date_ID"
+			}
+		},
+		"variables": {
+			"v_run_status": {
+				"type": "String"
+			}
+		},
+		"folder": {
+			"name": "bronze"
+		},
+		"annotations": []
+	}
+}

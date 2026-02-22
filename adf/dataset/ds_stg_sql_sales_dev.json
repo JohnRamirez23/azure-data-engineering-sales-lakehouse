@@ -5,6 +5,11 @@
 			"referenceName": "ls_sql_sales_dev",
 			"type": "LinkedServiceReference"
 		},
+		"parameters": {
+			"table_name": {
+				"type": "string"
+			}
+		},
 		"folder": {
 			"name": "staging"
 		},
@@ -63,7 +68,10 @@
 		],
 		"typeProperties": {
 			"schema": "dbo",
-			"table": "source_cars_data"
+			"table": {
+				"value": "@dataset().table_name",
+				"type": "Expression"
+			}
 		}
 	}
 }

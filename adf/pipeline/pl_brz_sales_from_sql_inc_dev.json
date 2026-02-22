@@ -122,8 +122,6 @@
 			{
 				"name": "act_if_new_data_exists",
 				"type": "IfCondition",
-				"state": "Inactive",
-				"onInactiveMarkAs": "Succeeded",
 				"dependsOn": [
 					{
 						"activity": "act_lkp_current_watermark_sql",
@@ -135,7 +133,7 @@
 				"userProperties": [],
 				"typeProperties": {
 					"expression": {
-						"value": "@not(equals(\n    activity('act_lkp_last_watermark_sql').output.firstRow.last_watermark_value,\n    activity('act_lkp_current_watermark_sql').output.firstRow.NewMaxValue\n))",
+						"value": "@greater(\n activity('act_lkp_current_watermark_sql').output.firstRow.current_watermark,\n activity('act_lkp_last_watermark_sql').output.firstRow.last_watermark_value\n)",
 						"type": "Expression"
 					},
 					"ifFalseActivities": [

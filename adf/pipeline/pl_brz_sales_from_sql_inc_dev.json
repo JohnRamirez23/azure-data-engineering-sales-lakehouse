@@ -57,7 +57,7 @@
 				"userProperties": []
 			},
 			{
-				"name": "Fail1",
+				"name": "act_fail_last_watermark_lookup",
 				"type": "Fail",
 				"dependsOn": [
 					{
@@ -73,7 +73,7 @@
 				}
 			},
 			{
-				"name": "Fail2",
+				"name": "act_fail_current_watermark_lookup",
 				"type": "Fail",
 				"dependsOn": [
 					{
@@ -107,7 +107,7 @@
 					},
 					"ifFalseActivities": [
 						{
-							"name": "Set variable1",
+							"name": "act_set_no_new_data_status",
 							"type": "SetVariable",
 							"dependsOn": [],
 							"policy": {
@@ -124,11 +124,11 @@
 							}
 						},
 						{
-							"name": "Stored procedure5",
+							"name": "act_sp_log_pipeline_status",
 							"type": "SqlServerStoredProcedure",
 							"dependsOn": [
 								{
-									"activity": "Set variable1",
+									"activity": "act_set_no_new_data_status",
 									"dependencyConditions": [
 										"Succeeded"
 									]
@@ -146,7 +146,10 @@
 								"storedProcedureName": "[dbo].[usp_LogRun]",
 								"storedProcedureParameters": {
 									"error_message": {
-										"value": "NULL",
+										"value": {
+											"value": "NULL",
+											"type": "Expression"
+										},
 										"type": "String"
 									},
 									"pipeline_name": {
@@ -157,7 +160,10 @@
 										"type": "String"
 									},
 									"rows_copied": {
-										"value": "0",
+										"value": {
+											"value": "0",
+											"type": "Expression"
+										},
 										"type": "Int32"
 									},
 									"source_table": {
@@ -168,7 +174,10 @@
 										"type": "String"
 									},
 									"status": {
-										"value": "'NO_NEW_DATA'",
+										"value": {
+											"value": "'NO_NEW_DATA'",
+											"type": "Expression"
+										},
 										"type": "String"
 									}
 								}
@@ -215,7 +224,7 @@
 							]
 						},
 						{
-							"name": "Stored procedure2",
+							"name": "act_sp_validate_new_records",
 							"type": "SqlServerStoredProcedure",
 							"dependsOn": [
 								{
@@ -255,7 +264,7 @@
 							}
 						},
 						{
-							"name": "Stored procedure4",
+							"name": "act_sp_update_watermark_sales",
 							"type": "SqlServerStoredProcedure",
 							"dependsOn": [
 								{
@@ -319,11 +328,11 @@
 							}
 						},
 						{
-							"name": "Stored procedure3",
+							"name": "act_sp_prepare_load_metadata",
 							"type": "SqlServerStoredProcedure",
 							"dependsOn": [
 								{
-									"activity": "Stored procedure2",
+									"activity": "act_sp_validate_new_records",
 									"dependencyConditions": [
 										"Succeeded"
 									]
@@ -383,11 +392,11 @@
 							}
 						},
 						{
-							"name": "Fail3",
+							"name": "act_fail_copy_sql_to_brz_sales_inc",
 							"type": "Fail",
 							"dependsOn": [
 								{
-									"activity": "Stored procedure4",
+									"activity": "act_sp_update_watermark_sales",
 									"dependencyConditions": [
 										"Completed"
 									]

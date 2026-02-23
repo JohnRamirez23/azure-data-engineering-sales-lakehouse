@@ -186,7 +186,10 @@
 				"outputs": [
 					{
 						"referenceName": "ds_stg_sql_sales_dev",
-						"type": "DatasetReference"
+						"type": "DatasetReference",
+						"parameters": {
+							"table_name": "source_cars_data"
+						}
 					}
 				]
 			}

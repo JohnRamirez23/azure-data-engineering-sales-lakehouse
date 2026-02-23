@@ -7,6 +7,14 @@
 			"metadata": "Data Factory name",
 			"defaultValue": "adf-sales-analytics-dev-brs"
 		},
+		"ls_adls_sales_dev_accountKey": {
+			"type": "secureString",
+			"metadata": "Secure string for 'accountKey' of 'ls_adls_sales_dev'"
+		},
+		"ls_adls_sales_dev_properties_typeProperties_url": {
+			"type": "string",
+			"defaultValue": "https://stsaleslhdevbrs01.dfs.core.windows.net/"
+		},
 		"ls_http_sales_dev_properties_typeProperties_url": {
 			"type": "string",
 			"defaultValue": "https://raw.githubusercontent.com/"
@@ -32,6 +40,23 @@
 		"factoryId": "[concat('Microsoft.DataFactory/factories/', parameters('factoryName'))]"
 	},
 	"resources": [
+		{
+			"name": "[concat(parameters('factoryName'), '/ls_adls_sales_dev')]",
+			"type": "Microsoft.DataFactory/factories/linkedServices",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"annotations": [],
+				"type": "AzureBlobFS",
+				"typeProperties": {
+					"url": "[parameters('ls_adls_sales_dev_properties_typeProperties_url')]",
+					"accountKey": {
+						"type": "SecureString",
+						"value": "[parameters('ls_adls_sales_dev_accountKey')]"
+					}
+				}
+			},
+			"dependsOn": []
+		},
 		{
 			"name": "[concat(parameters('factoryName'), '/ls_http_sales_dev')]",
 			"type": "Microsoft.DataFactory/factories/linkedServices",
@@ -59,6 +84,49 @@
 				}
 			},
 			"dependsOn": []
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/ds_brz_sales_sql_inc_dev')]",
+			"type": "Microsoft.DataFactory/factories/datasets",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"linkedServiceName": {
+					"referenceName": "ls_adls_sales_dev",
+					"type": "LinkedServiceReference"
+				},
+				"parameters": {
+					"p_directory": {
+						"type": "string"
+					},
+					"p_file_name": {
+						"type": "string"
+					}
+				},
+				"folder": {
+					"name": "bronze"
+				},
+				"annotations": [],
+				"type": "Parquet",
+				"typeProperties": {
+					"location": {
+						"type": "AzureBlobFSLocation",
+						"fileName": {
+							"value": "@dataset().p_file_name",
+							"type": "Expression"
+						},
+						"folderPath": {
+							"value": "@dataset().p_directory",
+							"type": "Expression"
+						},
+						"fileSystem": "bronze"
+					},
+					"compressionCodec": "snappy"
+				},
+				"schema": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/linkedServices/ls_adls_sales_dev')]"
+			]
 		},
 		{
 			"name": "[concat(parameters('factoryName'), '/ds_src_github_sales_dev')]",
@@ -135,6 +203,11 @@
 					"referenceName": "ls_sql_sales_dev",
 					"type": "LinkedServiceReference"
 				},
+				"parameters": {
+					"table_name": {
+						"type": "string"
+					}
+				},
 				"folder": {
 					"name": "staging"
 				},
@@ -193,11 +266,532 @@
 				],
 				"typeProperties": {
 					"schema": "dbo",
-					"table": "source_cars_data"
+					"table": {
+						"value": "@dataset().table_name",
+						"type": "Expression"
+					}
 				}
 			},
 			"dependsOn": [
 				"[concat(variables('factoryId'), '/linkedServices/ls_sql_sales_dev')]"
+			]
+		},
+		{
+			"name": "[concat(parameters('factoryName'), '/pl_brz_sales_from_sql_inc_dev')]",
+			"type": "Microsoft.DataFactory/factories/pipelines",
+			"apiVersion": "2018-06-01",
+			"properties": {
+				"activities": [
+					{
+						"name": "act_lkp_last_watermark_sql",
+						"type": "Lookup",
+						"dependsOn": [],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderStoredProcedureName": "[[dbo].[usp_GetWatermark]",
+								"storedProcedureParameters": {
+									"source_table": {
+										"type": "String",
+										"value": {
+											"value": "@pipeline().parameters.p_source_table",
+											"type": "Expression"
+										}
+									}
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "ds_stg_sql_sales_dev",
+								"type": "DatasetReference",
+								"parameters": {
+									"table_name": {
+										"value": "@pipeline().parameters.p_source_table",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					},
+					{
+						"name": "act_lkp_current_watermark_sql",
+						"type": "Lookup",
+						"dependsOn": [
+							{
+								"activity": "act_lkp_last_watermark_sql",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"policy": {
+							"timeout": "0.12:00:00",
+							"retry": 0,
+							"retryIntervalInSeconds": 30,
+							"secureOutput": false,
+							"secureInput": false
+						},
+						"userProperties": [],
+						"typeProperties": {
+							"source": {
+								"type": "AzureSqlSource",
+								"sqlReaderQuery": {
+									"value": "SELECT MAX(Date_ID) AS current_watermark\nFROM @{pipeline().parameters.p_source_table}",
+									"type": "Expression"
+								},
+								"queryTimeout": "02:00:00",
+								"partitionOption": "None"
+							},
+							"dataset": {
+								"referenceName": "ds_stg_sql_sales_dev",
+								"type": "DatasetReference",
+								"parameters": {
+									"table_name": {
+										"value": "@pipeline().parameters.p_source_table",
+										"type": "Expression"
+									}
+								}
+							}
+						}
+					},
+					{
+						"name": "act_fail_last_watermark_lookup",
+						"type": "Fail",
+						"dependsOn": [
+							{
+								"activity": "act_lkp_last_watermark_sql",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"message": "Watermark lookup failed.",
+							"errorCode": "WATERMARK_ERROR"
+						}
+					},
+					{
+						"name": "act_fail_current_watermark_lookup",
+						"type": "Fail",
+						"state": "Inactive",
+						"onInactiveMarkAs": "Succeeded",
+						"dependsOn": [
+							{
+								"activity": "act_lkp_current_watermark_sql",
+								"dependencyConditions": [
+									"Failed"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"message": "Watermark lookup failed.",
+							"errorCode": "WATERMARK_ERROR"
+						}
+					},
+					{
+						"name": "act_if_new_data_exists",
+						"type": "IfCondition",
+						"dependsOn": [
+							{
+								"activity": "act_lkp_current_watermark_sql",
+								"dependencyConditions": [
+									"Succeeded"
+								]
+							}
+						],
+						"userProperties": [],
+						"typeProperties": {
+							"expression": {
+								"value": "@greater(\n activity('act_lkp_current_watermark_sql').output.firstRow.current_watermark,\n activity('act_lkp_last_watermark_sql').output.firstRow.last_watermark_value\n)",
+								"type": "Expression"
+							},
+							"ifFalseActivities": [
+								{
+									"name": "act_set_no_new_data_status",
+									"type": "SetVariable",
+									"dependsOn": [],
+									"policy": {
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"variableName": "v_run_status",
+										"value": {
+											"value": "'NO_NEW_DATA'",
+											"type": "Expression"
+										}
+									}
+								},
+								{
+									"name": "act_sp_log_pipeline_status",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "act_set_no_new_data_status",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[dbo].[usp_LogRun]",
+										"storedProcedureParameters": {
+											"error_message": {
+												"value": {
+													"value": "NULL",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"pipeline_name": {
+												"value": {
+													"value": "@pipeline().Pipeline",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"rows_copied": {
+												"value": {
+													"value": "0",
+													"type": "Expression"
+												},
+												"type": "Int32"
+											},
+											"source_table": {
+												"value": {
+													"value": "@pipeline().parameters.p_source_table",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"status": {
+												"value": {
+													"value": "'NO_NEW_DATA'",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_sql_sales_dev",
+										"type": "LinkedServiceReference"
+									}
+								}
+							],
+							"ifTrueActivities": [
+								{
+									"name": "act_copy_sql_to_brz_sales_inc",
+									"type": "Copy",
+									"dependsOn": [],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"source": {
+											"type": "AzureSqlSource",
+											"sqlReaderQuery": {
+												"value": "SELECT *\nFROM @{pipeline().parameters.p_source_table}\nWHERE @{pipeline().parameters.p_watermark_column} > \n'@{activity('act_lkp_last_watermark_sql').output.firstRow.last_watermark_value}'",
+												"type": "Expression"
+											},
+											"queryTimeout": "02:00:00",
+											"partitionOption": "None"
+										},
+										"sink": {
+											"type": "ParquetSink",
+											"storeSettings": {
+												"type": "AzureBlobFSWriteSettings"
+											},
+											"formatSettings": {
+												"type": "ParquetWriteSettings"
+											}
+										},
+										"enableStaging": false,
+										"translator": {
+											"type": "TabularTranslator",
+											"typeConversion": true,
+											"typeConversionSettings": {
+												"allowDataTruncation": true,
+												"treatBooleanAsNumber": false
+											}
+										}
+									},
+									"inputs": [
+										{
+											"referenceName": "ds_stg_sql_sales_dev",
+											"type": "DatasetReference",
+											"parameters": {
+												"table_name": {
+													"value": "@pipeline().parameters.p_source_table",
+													"type": "Expression"
+												}
+											}
+										}
+									],
+									"outputs": [
+										{
+											"referenceName": "ds_brz_sales_sql_inc_dev",
+											"type": "DatasetReference",
+											"parameters": {
+												"p_directory": {
+													"value": "@concat('incremental')",
+													"type": "Expression"
+												},
+												"p_file_name": {
+													"value": "@concat(\n  activity('act_lkp_current_watermark_sql').output.firstRow.current_watermark,\n  '.parquet'\n)",
+													"type": "Expression"
+												}
+											}
+										}
+									]
+								},
+								{
+									"name": "act_sp_update_watermark_sales",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "act_copy_sql_to_brz_sales_inc",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[dbo].[usp_UpdateWatermark]",
+										"storedProcedureParameters": {
+											"new_watermark_value": {
+												"value": {
+													"value": "@activity('act_lkp_current_watermark_sql').output.firstRow.current_watermark",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"source_table": {
+												"value": {
+													"value": "@pipeline().parameters.p_source_table",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_sql_sales_dev",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "act_sp_prepare_load_metadata",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "act_sp_update_watermark_sales",
+											"dependencyConditions": [
+												"Succeeded"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[dbo].[usp_LogRun]",
+										"storedProcedureParameters": {
+											"error_message": {
+												"value": {
+													"value": "NULL",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"pipeline_name": {
+												"value": {
+													"value": "@pipeline().Pipeline",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"rows_copied": {
+												"value": {
+													"value": "@activity('act_copy_sql_to_brz_sales_inc').output.rowsCopied",
+													"type": "Expression"
+												},
+												"type": "Int32"
+											},
+											"source_table": {
+												"value": {
+													"value": "@pipeline().parameters.p_source_table",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"status": {
+												"value": {
+													"value": "'SUCCESS'",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_sql_sales_dev",
+										"type": "LinkedServiceReference"
+									}
+								},
+								{
+									"name": "act_fail_copy_sql_to_brz_sales_inc",
+									"type": "Fail",
+									"dependsOn": [
+										{
+											"activity": "act_sp_log_run_failed",
+											"dependencyConditions": [
+												"Completed"
+											]
+										}
+									],
+									"userProperties": [],
+									"typeProperties": {
+										"message": {
+											"value": "@concat('COPY FAILED - ', pipeline().Pipeline)",
+											"type": "Expression"
+										},
+										"errorCode": "COPY_FAILED"
+									}
+								},
+								{
+									"name": "act_sp_log_run_failed",
+									"type": "SqlServerStoredProcedure",
+									"dependsOn": [
+										{
+											"activity": "act_copy_sql_to_brz_sales_inc",
+											"dependencyConditions": [
+												"Failed"
+											]
+										}
+									],
+									"policy": {
+										"timeout": "0.12:00:00",
+										"retry": 0,
+										"retryIntervalInSeconds": 30,
+										"secureOutput": false,
+										"secureInput": false
+									},
+									"userProperties": [],
+									"typeProperties": {
+										"storedProcedureName": "[[dbo].[usp_LogRun]",
+										"storedProcedureParameters": {
+											"error_message": {
+												"value": {
+													"value": "@activity('act_copy_sql_to_brz_sales_inc').error.message",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"pipeline_name": {
+												"value": {
+													"value": "@pipeline().Pipeline",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"rows_copied": {
+												"value": {
+													"value": "0",
+													"type": "Expression"
+												},
+												"type": "Int32"
+											},
+											"source_table": {
+												"value": {
+													"value": "@pipeline().parameters.p_source_table",
+													"type": "Expression"
+												},
+												"type": "String"
+											},
+											"status": {
+												"value": {
+													"value": "'FAILED'",
+													"type": "Expression"
+												},
+												"type": "String"
+											}
+										}
+									},
+									"linkedServiceName": {
+										"referenceName": "ls_sql_sales_dev",
+										"type": "LinkedServiceReference"
+									}
+								}
+							]
+						}
+					}
+				],
+				"policy": {
+					"elapsedTimeMetric": {}
+				},
+				"parameters": {
+					"p_source_table": {
+						"type": "string",
+						"defaultValue": "source_cars_data"
+					},
+					"p_watermark_column": {
+						"type": "string",
+						"defaultValue": "Date_ID"
+					}
+				},
+				"variables": {
+					"v_run_status": {
+						"type": "String"
+					}
+				},
+				"folder": {
+					"name": "bronze"
+				},
+				"annotations": []
+			},
+			"dependsOn": [
+				"[concat(variables('factoryId'), '/datasets/ds_stg_sql_sales_dev')]",
+				"[concat(variables('factoryId'), '/linkedServices/ls_sql_sales_dev')]",
+				"[concat(variables('factoryId'), '/datasets/ds_brz_sales_sql_inc_dev')]"
 			]
 		},
 		{
@@ -391,7 +985,9 @@
 							{
 								"referenceName": "ds_stg_sql_sales_dev",
 								"type": "DatasetReference",
-								"parameters": {}
+								"parameters": {
+									"table_name": "source_cars_data"
+								}
 							}
 						]
 					}

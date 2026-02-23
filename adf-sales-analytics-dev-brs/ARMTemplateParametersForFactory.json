@@ -5,6 +5,12 @@
 		"factoryName": {
 			"value": "adf-sales-analytics-dev-brs"
 		},
+		"ls_adls_sales_dev_accountKey": {
+			"value": ""
+		},
+		"ls_adls_sales_dev_properties_typeProperties_url": {
+			"value": "https://stsaleslhdevbrs01.dfs.core.windows.net/"
+		},
 		"ls_http_sales_dev_properties_typeProperties_url": {
 			"value": "https://raw.githubusercontent.com/"
 		},
